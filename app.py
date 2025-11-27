@@ -75,23 +75,29 @@ if "show_admin_feed_form" not in st.session_state:
 if "show_fan_feed_form" not in st.session_state:
     st.session_state.show_fan_feed_form = False
 
-# ----------------- 탭 구조 -----------------
-tab_login, tab_profile, tab_home, tab_feed_admin, tab_feed_fan, tab_chat = st.tabs(
-    ["🔑 로그인", "👤 프로필", "🏠 홈", "📝 관리자 피드", "📝 팬 피드", "💬 채팅"]
-)
-
-# ----------------- 로그인 탭 -----------------
-with tab_login:
-    st.subheader("관리자 로그인")
-    username = st.text_input("아이디", key="login_user")
-    password = st.text_input("비밀번호", type="password", key="login_pass")
-    if st.button("로그인", key="login_btn"):
+# ----------------- 사이드바 로그인 -----------------
+st.sidebar.subheader("관리자 로그인")
+if not st.session_state.admin_logged_in:
+    username = st.sidebar.text_input("아이디")
+    password = st.sidebar.text_input("비밀번호", type="password")
+    if st.sidebar.button("로그인"):
         c.execute("SELECT * FROM profile WHERE username=? AND password=?", (username, password))
         if c.fetchone():
             st.session_state.admin_logged_in = True
-            st.success(f"{username}님 로그인 성공")
+            st.sidebar.success(f"{username}님 로그인 성공")
+            st.experimental_rerun()
         else:
-            st.error("아이디 또는 비밀번호 틀림")
+            st.sidebar.error("아이디 또는 비밀번호 틀림")
+else:
+    st.sidebar.success("관리자 로그인 상태 ✅")
+    if st.sidebar.button("로그아웃"):
+        st.session_state.admin_logged_in = False
+        st.experimental_rerun()
+
+# ----------------- 탭 구조 -----------------
+tab_profile, tab_home, tab_feed_admin, tab_feed_fan, tab_chat = st.tabs(
+    ["👤 프로필", "🏠 홈", "📝 관리자 피드", "📝 팬 피드", "💬 채팅"]
+)
 
 # ----------------- 프로필 탭 -----------------
 with tab_profile:
@@ -187,7 +193,6 @@ with tab_feed_fan:
 with tab_chat:
     st.subheader("💬 오픈 채팅")
     
-    # 관리자 테마 불러오기
     theme = c.execute("SELECT bg_color, text_color FROM chat_theme WHERE id=1").fetchone()
     bg_color, text_color = theme
 
@@ -204,7 +209,6 @@ with tab_chat:
             conn.commit()
             st.experimental_rerun()
     
-    # 관리자만 채팅 테마 설정 가능
     if st.session_state.admin_logged_in:
         st.markdown("---")
         st.subheader("🎨 관리자 채팅 테마 설정")
@@ -215,3 +219,4 @@ with tab_chat:
             conn.commit()
             st.success("채팅 테마 적용 완료")
             st.experimental_rerun()
+
