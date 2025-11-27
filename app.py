@@ -1,157 +1,140 @@
 import streamlit as st
+import sqlite3
 from datetime import datetime
-import uuid
 
-st.set_page_config(page_title="Channel", layout="centered")
+st.set_page_config(page_title="My Channel", layout="wide")
 
-# ====== 기본 데이터 ======
-if "admins" not in st.session_state:
-    st.session_state.admins = {
-        "admin": "1234",
-        "staff": "5678"
-    }
+# ----------------- DB 연결 -----------------
+conn = sqlite3.connect("channel.db", check_same_thread=False)
+c = conn.cursor()
 
+# 채팅 테이블
+c.execute("""
+CREATE TABLE IF NOT EXISTS chat (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nickname TEXT,
+    message TEXT,
+    time TEXT
+)
+""")
+
+# 게시판 테이블
+c.execute("""
+CREATE TABLE IF NOT EXISTS board (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    content TEXT,
+    writer TEXT,
+    time TEXT
+)
+""")
+
+# 공지 테이블
+c.execute("""
+CREATE TABLE IF NOT EXISTS notice (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    content TEXT,
+    time TEXT
+)
+""")
+
+# 관리자 계정 테이블
+c.execute("""
+CREATE TABLE IF NOT EXISTS admin (
+    username TEXT PRIMARY KEY,
+    password TEXT
+)
+""")
+
+# 기본 관리자 계정 등록 (없으면 추가)
+c.execute("SELECT * FROM admin WHERE username='admin'")
+if not c.fetchall():
+    c.execute("INSERT INTO admin VALUES (?,?)", ("admin", "1234"))
+conn.commit()
+
+# ----------------- 세션 초기화 -----------------
 if "admin_login" not in st.session_state:
-    st.session_state.admin_login = None
+    st.session_state.admin_login = False
 
-if "channel_name" not in st.session_state:
-    st.session_state.channel_name = "LINE Channel"
+if "admin_username" not in st.session_state:
+    st.session_state.admin_username = ""
 
-if "bio" not in st.session_state:
-    st.session_state.bio = "공식 채널입니다."
-
-if "profile_img" not in st.session_state:
-    st.session_state.profile_img = None
-
-if "chapters" not in st.session_state:
-    st.session_state.chapters = ["전체"]
-
-if "posts" not in st.session_state:
-    st.session_state.posts = []
-
-# ====== 모바일 친화 CSS ======
-st.markdown("""
-<style>
-.post { background:#f7f7f7; padding:16px; border-radius:14px; margin-bottom:16px; }
-.title { font-size:17px; font-weight:700; }
-.date, .meta { font-size:12px; color:#777; }
-button { width:100%; }
-</style>
-""", unsafe_allow_html=True)
-
-# ====== 관리자 로그인 ======
+# ----------------- 사이드바: 관리자 로그인 -----------------
 with st.sidebar:
     st.header("🔐 관리자 로그인")
-    admin_id = st.text_input("ID")
-    admin_pw = st.text_input("PW", type="password")
+    if not st.session_state.admin_login:
+        username = st.text_input("아이디")
+        password = st.text_input("비밀번호", type="password")
+        if st.button("로그인"):
+            c.execute("SELECT * FROM admin WHERE username=? AND password=?", (username, password))
+            if c.fetchall():
+                st.session_state.admin_login = True
+                st.session_state.admin_username = username
+                st.success(f"관리자로 로그인 됨: {username}")
+            else:
+                st.error("아이디 또는 비밀번호가 틀림")
+    else:
+        st.info(f"관리자: {st.session_state.admin_username}")
+        if st.button("로그아웃"):
+            st.session_state.admin_login = False
+            st.session_state.admin_username = ""
+            st.success("로그아웃 완료")
 
-    if st.button("로그인"):
-        if admin_id in st.session_state.admins and \
-           st.session_state.admins[admin_id] == admin_pw:
-            st.session_state.admin_login = admin_id
-            st.success(f"{admin_id} 로그인 성공")
-        else:
-            st.error("로그인 실패")
+# ----------------- 탭 구조 -----------------
+tab_home, tab_board, tab_chat = st.tabs(
+    ["🏠 홈", "🗂 게시판", "💬 채팅"]
+)
 
-# ====== 관리자 패널 ======
-if st.session_state.admin_login:
-    with st.sidebar:
-        st.header("⚙️ 관리자 설정")
+# ----------------- 홈 탭: 공지 -----------------
+with tab_home:
+    st.subheader("📢 공지사항")
+    if st.session_state.admin_login:
+        n_title = st.text_input("공지 제목", key="n_title")
+        n_content = st.text_area("공지 내용", key="n_content")
+        if st.button("공지 등록"):
+            if n_title and n_content:
+                c.execute("INSERT INTO notice VALUES (NULL,?,?,?)",
+                          (n_title, n_content, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                conn.commit()
+                st.success("공지 등록 완료")
+    notices = c.execute("SELECT title, content, time FROM notice ORDER BY id DESC").fetchall()
+    for t, ctt, tm in notices:
+        st.markdown(f"### 📌 {t}")
+        st.caption(tm)
+        st.write(ctt)
+        st.write("---")
 
-        st.session_state.channel_name = st.text_input(
-            "채널 이름", st.session_state.channel_name)
-        st.session_state.bio = st.text_area(
-            "자기소개", st.session_state.bio)
+# ----------------- 게시판 탭 -----------------
+with tab_board:
+    st.subheader("🗂 팬 게시판")
+    title = st.text_input("제목", key="b_title")
+    content = st.text_area("내용", key="b_content")
+    writer = st.text_input("작성자", key="b_writer")
+    if st.button("글쓰기"):
+        if title and content and writer:
+            c.execute("INSERT INTO board VALUES (NULL,?,?,?,?)",
+                      (title, content, writer, datetime.now().strftime("%Y-%m-%d %H:%M")))
+            conn.commit()
+            st.success("글 등록 완료")
+    rows = c.execute("SELECT title, content, writer, time FROM board ORDER BY id DESC").fetchall()
+    for t, ctt, w, tm in rows:
+        st.markdown(f"### {t}")
+        st.caption(f"{w} · {tm}")
+        st.write(ctt)
+        st.write("---")
 
-        img = st.file_uploader("프로필", type=["png","jpg","jpeg"])
-        if img:
-            st.session_state.profile_img = img
+# ----------------- 채팅 탭 -----------------
+with tab_chat:
+    st.subheader("💬 실시간 채팅")
+    nick = st.text_input("닉네임", key="chat_nick")
+    msg = st.text_input("메시지", key="chat_msg")
+    if st.button("전송", key="chat_send"):
+        if nick and msg:
+            c.execute("INSERT INTO chat VALUES (NULL,?,?,?)",
+                      (nick, msg, datetime.now().strftime("%H:%M")))
+            conn.commit()
+    rows = c.execute("SELECT nickname, message, time FROM chat ORDER BY id DESC LIMIT 50").fetchall()
+    for n, m, t in rows[::-1]:
+        st.write(f"[{t}] {n}: {m}")
 
-        st.subheader("👤 관리자 추가")
-        nid = st.text_input("새 ID")
-        npw = st.text_input("새 PW", type="password")
-        if st.button("관리자 추가"):
-            st.session_state.admins[nid] = npw
-
-        st.subheader("📂 챕터 추가")
-        chap = st.text_input("챕터 이름")
-        if st.button("추가") and chap:
-            st.session_state.chapters.append(chap)
-
-# ====== 프로필 표시 ======
-col1, col2 = st.columns([1,3])
-with col1:
-    st.image(st.session_state.profile_img or "https://via.placeholder.com/80", width=80)
-with col2:
-    st.markdown(f"### {st.session_state.channel_name}")
-    st.caption(st.session_state.bio)
-
-st.write("---")
-
-# ====== 게시물 작성 ======
-if st.session_state.admin_login:
-    st.subheader("✍️ 게시물 작성")
-    title = st.text_input("제목")
-    content = st.text_area("내용")
-    image = st.file_uploader("사진", type=["png","jpg"])
-    chapter = st.selectbox("챕터", st.session_state.chapters)
-    pin = st.checkbox("📌 고정")
-
-    if st.button("게시"):
-        st.session_state.posts.insert(0,{
-            "id": str(uuid.uuid4()),
-            "title": title,
-            "content": content,
-            "image": image,
-            "chapter": chapter,
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "likes": 0,
-            "views": 0,
-            "comments": [],
-            "pinned": pin
-        })
-
-# ====== 필터 ======
-selected = st.selectbox("📂 분류", st.session_state.chapters)
-
-# ====== 게시물 출력 ======
-posts = sorted(st.session_state.posts, key=lambda x:x["pinned"], reverse=True)
-
-for p in posts:
-    if selected!="전체" and p["chapter"]!=selected:
-        continue
-
-    p["views"] += 1
-
-    st.markdown('<div class="post">', unsafe_allow_html=True)
-    st.markdown(f"<div class='title'>{p['title']}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='meta'>👁 {p['views']} · ❤️ {p['likes']} · {p['time']}</div>", unsafe_allow_html=True)
-
-    if p["image"]:
-        st.image(p["image"])
-    st.write(p["content"])
-
-    # 좋아요
-    if st.button("❤️ 좋아요", key=p["id"]):
-        p["likes"] += 1
-
-    # 알림 문구 복사
-    copy_text = f"""[{st.session_state.channel_name}]
-{p['title']}
-
-{p['content'][:100]}"""
-
-    st.code(copy_text, language=None)
-
-    # 댓글
-    st.write("💬 댓글")
-    nick = st.text_input("닉네임", key=p["id"]+"n")
-    com = st.text_input("댓글 입력", key=p["id"]+"c")
-    if st.button("등록", key=p["id"]+"btn"):
-        if nick and com:
-            p["comments"].append(f"{nick}: {com}")
-
-    for c in p["comments"]:
-        st.caption(c)
-
-    st.markdown('</div>', unsafe_allow_html=True)
