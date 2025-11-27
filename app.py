@@ -49,14 +49,14 @@ if not st.session_state.admin_logged_in:
         if admin_data and password == admin_data["password"]:
             st.session_state.admin_logged_in = True
             st.sidebar.success(f"{username}님 로그인 성공")
-            st.experimental_rerun()
+            st.rerun()  # st.experimental_rerun() → st.rerun()
         else:
             st.sidebar.error("아이디 또는 비밀번호 틀림")
 else:
     st.sidebar.success("관리자 로그인 상태 ✅")
     if st.sidebar.button("로그아웃"):
         st.session_state.admin_logged_in = False
-        st.experimental_rerun()
+        st.rerun()
 
 # ----------------- 탭 -----------------
 tab_profile, tab_home, tab_feed_admin, tab_feed_fan, tab_chat = st.tabs(
@@ -82,7 +82,7 @@ with tab_profile:
             with open(DATA_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             st.success("프로필 업데이트 완료!")
-            st.experimental_rerun()
+            st.rerun()
 
 # ----------------- 홈 -----------------
 with tab_home:
@@ -123,7 +123,7 @@ with tab_feed_admin:
                     json.dump(data, f, ensure_ascii=False, indent=4)
                 st.success("게시 완료")
                 st.session_state.show_admin_feed_form = False
-                st.experimental_rerun()
+                st.rerun()
 
 # ----------------- 팬 피드 -----------------
 with tab_feed_fan:
@@ -154,7 +154,7 @@ with tab_feed_fan:
                     json.dump(data, f, ensure_ascii=False, indent=4)
                 st.success("게시 완료")
                 st.session_state.show_fan_feed_form = False
-                st.experimental_rerun()
+                st.rerun()
 
 # ----------------- 채팅 -----------------
 with tab_chat:
@@ -177,7 +177,7 @@ with tab_chat:
             })
             with open(DATA_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
-            st.experimental_rerun()
+            st.rerun()
 
     if st.session_state.admin_logged_in:
         st.markdown("---")
@@ -190,5 +190,6 @@ with tab_chat:
             with open(DATA_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             st.success("채팅 테마 적용 완료")
-            st.experimental_rerun()
+            st.rerun()
+
 
