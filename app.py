@@ -13,7 +13,7 @@ if not os.path.exists(DATA_FILE):
         "profile": {
             "admin": {
                 "bio": "안녕하세요! 관리자 프로필입니다.",
-                "profile_url": None,  # 기본 None, 업로드 시 표시
+                "profile_url": "https://via.placeholder.com/150",
                 "password": "1234"
             }
         },
@@ -49,7 +49,7 @@ if not st.session_state.admin_logged_in:
         if admin_data and password == admin_data["password"]:
             st.session_state.admin_logged_in = True
             st.sidebar.success(f"{username}님 로그인 성공")
-            st.rerun()
+            st.rerun()  # st.experimental_rerun() → st.rerun()
         else:
             st.sidebar.error("아이디 또는 비밀번호 틀림")
 else:
@@ -60,33 +60,25 @@ else:
 
 # ----------------- 탭 -----------------
 tab_profile, tab_home, tab_feed_admin, tab_feed_fan, tab_chat = st.tabs(
-    ["👤 프로필", "🏠 홈", "📝 관리자 피드", "📝 팬/친구 피드", "💬 채팅"]
+    ["👤 프로필", "🏠 홈", "📝 관리자 피드", "📝 팬 피드", "💬 채팅"]
 )
 
 # ----------------- 프로필 -----------------
 with tab_profile:
     st.subheader("👤 프로필")
     profile = data["profile"]["admin"]
-
-    # 프로필 사진 표시 (업로드 없으면 기본 이미지)
-    if profile["profile_url"]:
-        st.image(profile["profile_url"], width=150)
-    else:
-        st.image("https://via.placeholder.com/150", width=150)
-
+    st.image(profile["profile_url"], width=150)
     st.markdown(f"**admin**")
     st.write(profile["bio"])
 
-    # 관리자만 프로필 수정
     if st.session_state.admin_logged_in:
         st.markdown("---")
         st.subheader("프로필 수정 (관리자)")
         new_bio = st.text_area("자기소개", value=profile["bio"])
-        uploaded_file = st.file_uploader("프로필 사진 업로드", type=["png","jpg","jpeg"])
+        new_img = st.text_input("프로필 사진 URL", value=profile["profile_url"])
         if st.button("저장"):
             data["profile"]["admin"]["bio"] = new_bio
-            if uploaded_file:
-                data["profile"]["admin"]["profile_url"] = uploaded_file
+            data["profile"]["admin"]["profile_url"] = new_img
             with open(DATA_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             st.success("프로필 업데이트 완료!")
@@ -118,14 +110,13 @@ with tab_feed_admin:
 
     if st.session_state.show_admin_feed_form:
         content = st.text_area("내용", key="admin_content")
-        uploaded_file = st.file_uploader("이미지 업로드", type=["png","jpg","jpeg"], key="admin_feed_img")
+        image_url = st.text_input("이미지 URL (선택)", key="admin_img")
         if st.button("게시", key="admin_post"):
             if content:
-                img_data = uploaded_file if uploaded_file else None
                 data["feed_admin"].append({
                     "writer": "admin",
                     "content": content,
-                    "image_url": img_data,
+                    "image_url": image_url,
                     "time": datetime.now().strftime("%Y-%m-%d %H:%M")
                 })
                 with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -134,9 +125,9 @@ with tab_feed_admin:
                 st.session_state.show_admin_feed_form = False
                 st.rerun()
 
-# ----------------- 팬/친구 피드 -----------------
+# ----------------- 팬 피드 -----------------
 with tab_feed_fan:
-    st.subheader("📝 팬/친구 피드")
+    st.subheader("📝 팬 피드")
     for post in reversed(data["feed_fan"]):
         st.markdown(f"**{post['writer']} · {post['time']}**")
         st.write(post["content"])
@@ -144,20 +135,19 @@ with tab_feed_fan:
             st.image(post["image_url"], width=300)
         st.write("---")
 
-    if st.button("➕ 게시물 작성 (팬/친구)"):
+    if st.button("➕ 게시물 작성 (팬)"):
         st.session_state.show_fan_feed_form = True
 
     if st.session_state.show_fan_feed_form:
         writer = st.text_input("작성자 이름", key="fan_writer")
         content = st.text_area("내용", key="fan_content")
-        uploaded_file = st.file_uploader("이미지 업로드", type=["png","jpg","jpeg"], key="fan_feed_img")
+        image_url = st.text_input("이미지 URL (선택)", key="fan_img")
         if st.button("게시", key="fan_post"):
             if writer and content:
-                img_data = uploaded_file if uploaded_file else None
                 data["feed_fan"].append({
                     "writer": writer,
                     "content": content,
-                    "image_url": img_data,
+                    "image_url": image_url,
                     "time": datetime.now().strftime("%Y-%m-%d %H:%M")
                 })
                 with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -201,5 +191,6 @@ with tab_chat:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             st.success("채팅 테마 적용 완료")
             st.rerun()
+
 
 
